@@ -9,12 +9,6 @@
 
 set -euo pipefail
 
-# 检测是否有 TTY（用于判断是否可以交互）
-HAS_TTY=false
-if [[ -t 0 ]]; then
-    HAS_TTY=true
-fi
-
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -295,41 +289,13 @@ interactive_setup() {
     local recommended=$(get_recommended_interface)
     
     if [[ -z "$recommended" ]]; then
-        log_error "无法找到可用的网络接口，请使用命令行参数模式"
+        log_error "无法找到可用的网络接口"
         return 1
     fi
     
-    # 如果没有 TTY（非交互模式），获取当前 IP 配置为静态
-    if [[ "$HAS_TTY" == "false" ]]; then
-        log_warn "检测到非交互模式，将当前 IP 配置为静态"
-        
-        # 获取当前 IP 配置
-        local ip_config=$(get_current_ip_config "$recommended")
-        IFS=':' read -r current_ip current_gateway current_dns1 current_dns2 <<< "$ip_config"
-        
-        if [[ -z "$current_ip" ]]; then
-            log_error "无法获取网卡 $recommended 的 IP 地址，请检查网络连接"
-            return 1
-        fi
-        
-        log_info "========== 网络配置 =========="
-        log_info "自动检测到网卡配置:"
-        log_info "  网卡: ${GREEN}$recommended${NC}"
-        log_info "  IP地址: ${GREEN}$current_ip${NC}"
-        log_info "  网关: ${GREEN}$current_gateway${NC}"
-        log_info "  DNS: ${GREEN}$current_dns1, $current_dns2${NC}"
-        log_info ""
-        log_info "正在将此配置设置为静态 IP..."
-        
-        configure_network "$recommended" "$current_ip" "$current_gateway" "$current_dns1" "$current_dns2"
-        return 0
-    fi
-    
-    # 交互模式
-    log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
     # 交互模式 - 选择网卡
     log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
-    read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface
+    read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface < /dev/tty
     iface=${iface:-$recommended}  # 如果用户直接回车，使用推荐值
     
     if [[ -z "$iface" ]]; then
@@ -354,14 +320,14 @@ interactive_setup() {
     log_info "  DNS: ${GREEN}$current_dns1, $current_dns2${NC}"
     echo ""
     
-    read -p "是否使用此 IP？(y/n 直接回车使用 y): " use_current_ip
+    read -p "是否使用此 IP？(y/n 直接回车使用 y): " use_current_ip < /dev/tty
     use_current_ip=${use_current_ip:-y}
     
     if [[ "$use_current_ip" =~ ^[Yy]$ ]]; then
         # 用户选择使用当前 IP
         log_info "使用当前 IP 地址"
         
-        read -p "是否将其修改为静态？(y/n 直接回车使用 n): " set_static
+        read -p "是否将其修改为静态？(y/n 直接回车使用 n): " set_static < /dev/tty
         set_static=${set_static:-n}
         
         if [[ "$set_static" =~ ^[Yy]$ ]]; then
@@ -380,22 +346,22 @@ interactive_setup() {
         log_info "使用自定义 IP 配置"
         echo ""
         
-        read -p "请输入静态IP（如：192.168.1.10）: " ip
+        read -p "请输入静态IP（如：192.168.1.10）: " ip < /dev/tty
         if [[ -z "$ip" ]]; then
             log_error "IP不能为空"
             return 1
         fi
         
-        read -p "请输入网关（如：192.168.1.1）: " gateway
+        read -p "请输入网关（如：192.168.1.1）: " gateway < /dev/tty
         if [[ -z "$gateway" ]]; then
             log_error "网关不能为空"
             return 1
         fi
         
-        read -p "请输入DNS1（默认：8.8.8.8）: " dns1
+        read -p "请输入DNS1（默认：8.8.8.8）: " dns1 < /dev/tty
         dns1=${dns1:-8.8.8.8}
         
-        read -p "请输入DNS2（默认：8.8.4.4）: " dns2
+        read -p "请输入DNS2（默认：8.8.4.4）: " dns2 < /dev/tty
         dns2=${dns2:-8.8.4.4}
     fi
     
@@ -406,7 +372,7 @@ interactive_setup() {
     log_info "  DNS: $dns1, $dns2"
     echo ""
     
-    read -p "确认上述配置？(y/n 直接回车使用 y): " confirm
+    read -p "确认上述配置？(y/n 直接回车使用 y): " confirm < /dev/tty
     confirm=${confirm:-y}
     
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
@@ -451,41 +417,35 @@ main() {
     log_info "========== SSH 配置 =========="
     echo ""
     
-    if [[ "$HAS_TTY" == "false" ]]; then
-        log_warn "非交互模式，自动启用 root SSH 登录和密钥生成"
+    log_info "SSH 安全建议："
+    log_info "  • 启用 root SSH 登录（默认禁用）"
+    log_info "  • 生成 SSH 密钥对用于无密码登录"
+    echo ""
+    
+    read -p "是否启用 root SSH 登录？(y/n 直接回车使用 y): " enable_root_ssh_choice < /dev/tty
+    enable_root_ssh_choice=${enable_root_ssh_choice:-y}
+    
+    if [[ "$enable_root_ssh_choice" =~ ^[Yy]$ ]]; then
         enable_root_ssh
-        generate_ssh_keys
-    else
-        log_info "SSH 安全建议："
-        log_info "  • 启用 root SSH 登录（默认禁用）"
-        log_info "  • 生成 SSH 密钥对用于无密码登录"
+        log_info "已启用 root SSH 登录"
         echo ""
         
-        read -p "是否启用 root SSH 登录？(y/n 直接回车使用 y): " enable_root_ssh_choice
-        enable_root_ssh_choice=${enable_root_ssh_choice:-y}
+        read -p "是否为 root 用户生成 SSH 密钥对？(y/n 直接回车使用 y): " generate_keys_choice < /dev/tty
+        generate_keys_choice=${generate_keys_choice:-y}
         
-        if [[ "$enable_root_ssh_choice" =~ ^[Yy]$ ]]; then
-            enable_root_ssh
-            log_info "已启用 root SSH 登录"
+        if [[ "$generate_keys_choice" =~ ^[Yy]$ ]]; then
+            generate_ssh_keys
+            log_info "SSH 密钥已生成"
             echo ""
-            
-            read -p "是否为 root 用户生成 SSH 密钥对？(y/n 直接回车使用 y): " generate_keys_choice
-            generate_keys_choice=${generate_keys_choice:-y}
-            
-            if [[ "$generate_keys_choice" =~ ^[Yy]$ ]]; then
-                generate_ssh_keys
-                log_info "SSH 密钥已生成"
-                echo ""
-                log_info "密钥位置："
-                log_info "  • 私钥: /root/.ssh/id_rsa （保密，不要分享）"
-                log_info "  • 公钥: /root/.ssh/id_rsa.pub （可复制到其他服务器）"
-            else
-                log_info "已跳过密钥生成，稍后可手动执行:"
-                log_info "  ssh-keygen -t rsa -N '' -f /root/.ssh/id_rsa"
-            fi
+            log_info "密钥位置："
+            log_info "  • 私钥: /root/.ssh/id_rsa （保密，不要分享）"
+            log_info "  • 公钥: /root/.ssh/id_rsa.pub （可复制到其他服务器）"
         else
-            log_warn "已跳过 SSH 配置，root 远程登录保持禁用"
+            log_info "已跳过密钥生成，稍后可手动执行:"
+            log_info "  ssh-keygen -t rsa -N '' -f /root/.ssh/id_rsa"
         fi
+    else
+        log_warn "已跳过 SSH 配置，root 远程登录保持禁用"
     fi
     
     # 显示系统信息
