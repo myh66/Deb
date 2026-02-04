@@ -2,6 +2,15 @@
 
 一个完整的 Bash 初始化脚本，用于配置 Debian/Ubuntu 系统的静态网络和启用 root SSH 登录。
 
+[![GitHub](https://img.shields.io/badge/GitHub-myh66/Deb-blue?logo=github)](https://github.com/myh66/Deb)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+## 📚 文档导航
+
+- [快速开始指南](QUICKSTART.md) - 30秒快速配置
+- [配置示例](EXAMPLES.md) - 8种常见场景配置
+- [部署指南](DEPLOY.md) - 生产环境部署方法
+
 ## 功能特性
 
 ✅ 支持 **netplan** 和 **ifupdown** 两种网络配置方式
@@ -13,12 +22,18 @@
 ✅ 交互式和命令行两种使用方式
 ✅ 彩色日志输出和错误处理
 
-## 使用方法
+## 快速开始
 
-### 方式1：远程下载并执行（推荐用于生产环境）
+### 方式1：远程下载并执行（推荐）
 
 ```bash
-curl -fsSL https://example.com/init-debian.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash
+```
+
+或使用 GitHub 加速镜像：
+
+```bash
+curl -fsSL https://ghproxy.com/https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash
 ```
 
 ### 方式2：交互式模式（需要手动输入参数）
@@ -77,16 +92,22 @@ PermitRootLogin yes
 
 原始配置会被备份为 `/etc/ssh/sshd_config.bak`
 
-## 部署到服务器
+## GitHub 仓库
 
-### 1. 上传脚本到Web服务器
+项目地址：[https://github.com/myh66/Deb](https://github.com/myh66/Deb)
+
+### 克隆仓库
 ```bash
-scp init-debian.sh user@your-server:/var/www/html/
+git clone https://github.com/myh66/Deb.git
+cd Deb
+sudo bash init-debian.sh
 ```
 
-### 2. 在目标服务器执行
+### 下载单个脚本
 ```bash
-curl -fsSL http://your-server.com/init-debian.sh | sudo bash
+wget https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh
+chmod +x init-debian.sh
+sudo ./init-debian.sh
 ```
 
 ## 安全建议
@@ -95,21 +116,25 @@ curl -fsSL http://your-server.com/init-debian.sh | sudo bash
 
 1. **验证脚本完整性**
    ```bash
-   # 添加 SHA256 校验
-   curl -fsSL http://your-server.com/init-debian.sh | sha256sum
+   # 下载脚本并查看内容
+   curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | cat
+   # 验证后再执行
+   curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash
    ```
 
 2. **使用HTTPS传输**
    ```bash
-   curl -fsSL https://your-server.com/init-debian.sh | sudo bash
+   # GitHub 提供 HTTPS 传输
+   curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash
    ```
 
 3. **仅在可信网络环境执行**
 
-4. **审核脚本内容**
+4. **使用测试工具验证**
    ```bash
-   curl -fsSL https://your-server.com/init-debian.sh | cat
-   # 审核后再执行
+   # 克隆仓库后使用验证工具
+   bash verify.sh
+   bash test-syntax.sh
    ```
 
 5. **配置SSH认证**
