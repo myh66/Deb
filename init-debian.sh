@@ -4,13 +4,15 @@
 # Debian/Ubuntu 初始化脚本
 # 用途：配置静态网络 + 启用 root SSH 登录
 # 使用: curl -fsSL https://example.com/init-debian.sh | sudo bash
+# 参数: init-debian.sh [iface] [ip] [gateway] [dns1] [dns2]
 ##############################################################################
 
 set -euo pipefail
 
-# 如果通过管道执行，重定向 stdin 到 /dev/tty 以支持交互式输入
-if [[ ! -t 0 ]]; then
-    exec </dev/tty
+# 检测是否有 TTY（用于判断是否可以交互）
+HAS_TTY=false
+if [[ -t 0 ]]; then
+    HAS_TTY=true
 fi
 
 # 颜色输出
@@ -275,13 +277,24 @@ interactive_setup() {
     # 获取推荐的网络接口
     local recommended=$(get_recommended_interface)
     
-    if [[ -n "$recommended" ]]; then
-        log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
-        read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface
-        iface=${iface:-$recommended}  # 如果用户直接回车，使用推荐值
-    else
-        read -p "请输入要配置的网络接口（如：eth0）: " iface
+    if [[ -z "$recommended" ]]; then
+        log_error "无法找到可用的网络接口，请使用命令行参数模式"
+        return 1
     fi
+    
+    # 如果没有 TTY（非交互模式），使用推荐值和默认 IP
+    if [[ "$HAS_TTY" == "false" ]]; then
+        log_warn "检测到非交互模式（如通过管道或 SSH 执行），使用自动配置"
+        log_info "推荐网卡: ${GREEN}$recommended${NC}"
+        log_info "使用默认 IP: 192.168.1.100/24"
+        configure_network "$recommended" "192.168.1.100" "192.168.1.1" "8.8.8.8" "8.8.4.4"
+        return 0
+    fi
+    
+    # 交互模式
+    log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
+    read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface
+    iface=${iface:-$recommended}  # 如果用户直接回车，使用推荐值
     
     if [[ -z "$iface" ]]; then
         log_error "网络接口不能为空"
@@ -357,10 +370,16 @@ main() {
     fi
     
     # 启用Root SSH登录
-    read -p "启用 root SSH 登录？(y/n): " enable_ssh
-    if [[ "$enable_ssh" =~ ^[Yy]$ ]]; then
+    if [[ "$HAS_TTY" == "false" ]]; then
+        log_warn "非交互模式，自动启用 root SSH 登录"
         enable_root_ssh
         generate_ssh_keys
+    else
+        read -p "启用 root SSH 登录？(y/n): " enable_ssh
+        if [[ "$enable_ssh" =~ ^[Yy]$ ]]; then
+            enable_root_ssh
+            generate_ssh_keys
+        fi
     fi
     
     # 显示系统信息
