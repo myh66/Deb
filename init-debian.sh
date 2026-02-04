@@ -458,6 +458,36 @@ main() {
     log_info "  主机名: $(hostname)"
     log_info "  IP地址: $(hostname -I)"
     log_info "  SSH状态: $(systemctl is-active ssh || systemctl is-active sshd)"
+    
+    # 检测用户状态
+    echo ""
+    log_info "当前用户状态:"
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        log_info "  • 您通过 sudo 以普通用户 ${GREEN}$SUDO_USER${NC} 的身份执行脚本"
+        log_info "  • root 用户已配置，可以使用 ${GREEN}su root${NC} 或 ${GREEN}sudo -i${NC} 切换"
+    else
+        log_info "  • 您直接以 ${GREEN}root${NC} 用户身份执行脚本"
+    fi
+    
+    # 询问是否重启
+    echo ""
+    log_info "========== 系统重启 =========="
+    log_info "建议："
+    log_info "  • 网络配置更改后建议重启以确保生效"
+    log_info "  • SSH 配置已生效，无需重启"
+    echo ""
+    
+    read -p "是否现在重启系统？(y/n 直接回车跳过): " reboot_choice < /dev/tty
+    reboot_choice=${reboot_choice:-n}
+    
+    if [[ "$reboot_choice" =~ ^[Yy]$ ]]; then
+        log_info "正在重启系统..."
+        sleep 2
+        reboot
+    else
+        log_info "已跳过重启，可稍后手动执行: sudo reboot"
+    fi
+    
     echo ""
 }
 
