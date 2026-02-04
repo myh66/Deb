@@ -86,12 +86,20 @@ network:
       dhcp4: false
       addresses:
         - $ip/24
-      gateway4: $gateway
+      routes:
+        - to: default
+          via: $gateway
       nameservers:
         addresses: [$dns1, $dns2]
 EOF
     
-    chmod 644 /etc/netplan/00-static-ip.yaml
+    # 设置安全权限（仅root可读写）
+    chmod 600 /etc/netplan/00-static-ip.yaml
+    
+    # 确保systemd-networkd服务已启用并运行
+    systemctl enable systemd-networkd 2>/dev/null || true
+    systemctl start systemd-networkd 2>/dev/null || true
+    
     netplan apply
     log_info "netplan 配置已应用"
 }
