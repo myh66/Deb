@@ -215,11 +215,51 @@ install_tools() {
     log_info "基础工具安装完成"
 }
 
-# 显示网络接口
+# 获取推荐的网络接口（排除lo，优先选择UP状态的接口）
+get_recommended_interface() {
+    local interfaces=()
+    local recommended=""
+    
+    # 获取所有非lo接口
+    while IFS= read -r line; do
+        local iface=$(echo "$line" | awk '{print $2}' | sed 's/://g')
+        local state=$(echo "$line" | grep -o 'state [A-Z]*' | awk '{print $2}')
+        
+        if [[ "$iface" != "lo" ]]; then
+            interfaces+=("$iface")
+            # 优先推荐UP状态的接口
+            if [[ "$state" == "UP" ]] && [[ -z "$recommended" ]]; then
+                recommended="$iface"
+            fi
+        fi
+    done < <(ip link show | grep "^[0-9]:")
+    
+    # 如果没有UP状态的接口，就推荐第一个
+    if [[ -z "$recommended" ]] && [[ ${#interfaces[@]} -gt 0 ]]; then
+        recommended="${interfaces[0]}"
+    fi
+    
+    echo "$recommended"
+}
+
+# 显示网络接口（带状态）
 show_interfaces() {
     echo ""
     log_info "系统网络接口："
-    ip link show | grep "^[0-9]:" | awk -F': ' '{print "  - " $2}' | head -n 10
+    
+    while IFS= read -r line; do
+        local iface=$(echo "$line" | awk '{print $2}' | sed 's/://g')
+        local state=$(echo "$line" | grep -o 'state [A-Z]*' | awk '{print $2}')
+        
+        if [[ "$iface" != "lo" ]]; then
+            if [[ "$state" == "UP" ]]; then
+                echo -e "  ${GREEN}✓${NC} $iface (状态: $state)"
+            else
+                echo -e "  ${YELLOW}○${NC} $iface (状态: $state)"
+            fi
+        fi
+    done < <(ip link show | grep "^[0-9]:")
+    
     echo ""
 }
 
@@ -227,9 +267,25 @@ show_interfaces() {
 interactive_setup() {
     show_interfaces
     
-    read -p "请输入要配置的网络接口（如：eth0）: " iface
+    # 获取推荐的网络接口
+    local recommended=$(get_recommended_interface)
+    
+    if [[ -n "$recommended" ]]; then
+        log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
+        read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface
+        iface=${iface:-$recommended}  # 如果用户直接回车，使用推荐值
+    else
+        read -p "请输入要配置的网络接口（如：eth0）: " iface
+    fi
+    
     if [[ -z "$iface" ]]; then
         log_error "网络接口不能为空"
+        return 1
+    fi
+    
+    # 验证接口是否存在
+    if ! ip link show "$iface" &>/dev/null; then
+        log_error "网络接口 $iface 不存在"
         return 1
     fi
     
