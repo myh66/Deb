@@ -417,35 +417,38 @@ main() {
     log_info "========== SSH 配置 =========="
     echo ""
     
-    log_info "SSH 安全建议："
-    log_info "  • 启用 root SSH 登录（默认禁用）"
-    log_info "  • 生成 SSH 密钥对用于无密码登录"
+    log_info "root SSH 登录配置："
+    log_info "  • 启用 root SSH 密码登录（允许使用密码远程登录 root 账户）"
     echo ""
     
-    read -p "是否启用 root SSH 登录？(y/n 直接回车使用 y): " enable_root_ssh_choice < /dev/tty
+    read -p "是否启用 root SSH 密码登录？(y/n 直接回车使用 y): " enable_root_ssh_choice < /dev/tty
     enable_root_ssh_choice=${enable_root_ssh_choice:-y}
     
     if [[ "$enable_root_ssh_choice" =~ ^[Yy]$ ]]; then
         enable_root_ssh
-        log_info "已启用 root SSH 登录"
+        log_info "✓ 已启用 root SSH 密码登录"
         echo ""
         
-        read -p "是否为 root 用户生成 SSH 密钥对？(y/n 直接回车使用 y): " generate_keys_choice < /dev/tty
-        generate_keys_choice=${generate_keys_choice:-y}
+        log_info "SSH 密钥配置（可选）："
+        log_info "  • SSH 密钥用于免密登录，比密码更安全"
+        log_info "  • 如果您不需要免密登录，可以跳过"
+        echo ""
+        
+        read -p "是否生成 SSH 密钥对？(y/n 直接回车跳过): " generate_keys_choice < /dev/tty
+        generate_keys_choice=${generate_keys_choice:-n}
         
         if [[ "$generate_keys_choice" =~ ^[Yy]$ ]]; then
             generate_ssh_keys
-            log_info "SSH 密钥已生成"
+            log_info "✓ SSH 密钥已生成"
             echo ""
             log_info "密钥位置："
             log_info "  • 私钥: /root/.ssh/id_rsa （保密，不要分享）"
-            log_info "  • 公钥: /root/.ssh/id_rsa.pub （可复制到其他服务器）"
+            log_info "  • 公钥: /root/.ssh/id_rsa.pub （可添加到其他服务器实现免密登录）"
         else
-            log_info "已跳过密钥生成，稍后可手动执行:"
-            log_info "  ssh-keygen -t rsa -N '' -f /root/.ssh/id_rsa"
+            log_info "已跳过密钥生成，可稍后手动执行: ssh-keygen -t rsa"
         fi
     else
-        log_warn "已跳过 SSH 配置，root 远程登录保持禁用"
+        log_info "已跳过 SSH 配置，root 密码登录保持禁用"
     fi
     
     # 显示系统信息
