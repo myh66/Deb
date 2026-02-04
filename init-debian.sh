@@ -282,12 +282,16 @@ interactive_setup() {
         return 1
     fi
     
-    # 如果没有 TTY（非交互模式），使用推荐值和默认 IP
+    # 如果没有 TTY（非交互模式），给用户选择
     if [[ "$HAS_TTY" == "false" ]]; then
-        log_warn "检测到非交互模式（如通过管道或 SSH 执行），使用自动配置"
+        log_warn "检测到非交互模式，无法进行网络配置交互"
         log_info "推荐网卡: ${GREEN}$recommended${NC}"
-        log_info "使用默认 IP: 192.168.1.100/24"
-        configure_network "$recommended" "192.168.1.100" "192.168.1.1" "8.8.8.8" "8.8.4.4"
+        log_info ""
+        log_info "选项1: 跳过网络配置，使用当前IP（${GREEN}推荐${NC}）"
+        log_info "选项2: 使用参数指定网络配置，如:"
+        log_info "  curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash -s - $recommended 192.168.1.100 192.168.1.1"
+        log_info ""
+        log_info "现在将跳过网络配置，仅启用 SSH"
         return 0
     fi
     
