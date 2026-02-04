@@ -100,8 +100,25 @@ EOF
     systemctl enable systemd-networkd 2>/dev/null || true
     systemctl start systemd-networkd 2>/dev/null || true
     
-    netplan apply
-    log_info "netplan 配置已应用"
+    echo ""
+    echo -e "\033[1;33m[警告] 应用网络配置会立即生效，可能导致SSH连接短暂中断！\033[0m"
+    echo ""
+    echo "建议操作方式："
+    echo "  1) 立即应用（可能断线，需手动重连）"
+    echo "  2) 仅保存配置，稍后手动重启系统"
+    echo ""
+    read -p "请选择 (1/2 直接回车使用 2): " apply_choice < /dev/tty
+    apply_choice=${apply_choice:-2}
+    
+    if [[ "$apply_choice" == "1" ]]; then
+        log_info "正在应用配置，SSH连接可能会中断..."
+        sleep 2
+        netplan apply
+        log_info "netplan 配置已应用"
+    else
+        log_info "配置已保存到 /etc/netplan/00-static-ip.yaml"
+        log_info "将在系统重启时自动生效，或稍后手动执行: netplan apply"
+    fi
 }
 
 # 配置ifupdown静态网络
@@ -124,8 +141,27 @@ iface $iface inet static
 EOF
     
     chmod 644 /etc/network/interfaces.d/99-static-ip
-    ifup $iface 2>/dev/null || true
-    log_info "ifupdown 配置已应用"
+    
+    echo ""
+    echo -e "\033[1;33m[警告] 应用网络配置会立即生效，可能导致SSH连接短暂中断！\033[0m"
+    echo ""
+    echo "建议操作方式："
+    echo "  1) 立即应用（可能断线，需手动重连）"
+    echo "  2) 仅保存配置，稍后手动重启系统"
+    echo ""
+    read -p "请选择 (1/2 直接回车使用 2): " apply_choice < /dev/tty
+    apply_choice=${apply_choice:-2}
+    
+    if [[ "$apply_choice" == "1" ]]; then
+        log_info "正在应用配置，SSH连接可能会中断..."
+        sleep 2
+        ifdown $iface 2>/dev/null || true
+        ifup $iface 2>/dev/null || true
+        log_info "ifupdown 配置已应用"
+    else
+        log_info "配置已保存到 /etc/network/interfaces.d/99-static-ip"
+        log_info "将在系统重启时自动生效，或稍后手动执行: ifdown $iface && ifup $iface"
+    fi
 }
 
 # 配置静态网络
