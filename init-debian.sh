@@ -449,20 +449,42 @@ main() {
     # 启用Root SSH登录
     echo ""
     log_info "========== SSH 配置 =========="
+    echo ""
     
     if [[ "$HAS_TTY" == "false" ]]; then
-        log_warn "非交互模式，自动启用 root SSH 登录"
+        log_warn "非交互模式，自动启用 root SSH 登录和密钥生成"
         enable_root_ssh
         generate_ssh_keys
     else
-        read -p "启用 root SSH 登录？(y/n 直接回车使用 y): " enable_ssh
-        enable_ssh=${enable_ssh:-y}
+        log_info "SSH 安全建议："
+        log_info "  • 启用 root SSH 登录（默认禁用）"
+        log_info "  • 生成 SSH 密钥对用于无密码登录"
+        echo ""
         
-        if [[ "$enable_ssh" =~ ^[Yy]$ ]]; then
+        read -p "是否启用 root SSH 登录？(y/n 直接回车使用 y): " enable_root_ssh_choice
+        enable_root_ssh_choice=${enable_root_ssh_choice:-y}
+        
+        if [[ "$enable_root_ssh_choice" =~ ^[Yy]$ ]]; then
             enable_root_ssh
-            generate_ssh_keys
+            log_info "已启用 root SSH 登录"
+            echo ""
+            
+            read -p "是否为 root 用户生成 SSH 密钥对？(y/n 直接回车使用 y): " generate_keys_choice
+            generate_keys_choice=${generate_keys_choice:-y}
+            
+            if [[ "$generate_keys_choice" =~ ^[Yy]$ ]]; then
+                generate_ssh_keys
+                log_info "SSH 密钥已生成"
+                echo ""
+                log_info "密钥位置："
+                log_info "  • 私钥: /root/.ssh/id_rsa （保密，不要分享）"
+                log_info "  • 公钥: /root/.ssh/id_rsa.pub （可复制到其他服务器）"
+            else
+                log_info "已跳过密钥生成，稍后可手动执行:"
+                log_info "  ssh-keygen -t rsa -N '' -f /root/.ssh/id_rsa"
+            fi
         else
-            log_info "已跳过 SSH 配置"
+            log_warn "已跳过 SSH 配置，root 远程登录保持禁用"
         fi
     fi
     
