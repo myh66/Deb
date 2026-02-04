@@ -249,6 +249,23 @@ get_recommended_interface() {
     echo "$recommended"
 }
 
+# 获取网卡的当前IP配置
+get_current_ip_config() {
+    local iface=$1
+    
+    # 尝试从 IP 命令获取 IP 地址
+    local ip_addr=$(ip addr show "$iface" 2>/dev/null | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+' | head -1)
+    
+    # 尝试获取网关
+    local gateway=$(ip route show | grep -oP '(?<=via\s)\d+\.\d+\.\d+\.\d+' | head -1)
+    
+    # 尚获取DNS（从 /etc/resolv.conf）
+    local dns1=$(grep -oP '(?<=nameserver\s)\d+\.\d+\.\d+\.\d+' /etc/resolv.conf 2>/dev/null | head -1)
+    local dns2=$(grep -oP '(?<=nameserver\s)\d+\.\d+\.\d+\.\d+' /etc/resolv.conf 2>/dev/null | tail -1)
+    
+    echo "$ip_addr:$gateway:${dns1:-8.8.8.8}:${dns2:-8.8.4.4}"
+}
+
 # 显示网络接口（带状态）
 show_interfaces() {
     echo ""
@@ -282,16 +299,30 @@ interactive_setup() {
         return 1
     fi
     
-    # 如果没有 TTY（非交互模式），给用户选择
+    # 如果没有 TTY（非交互模式），获取当前 IP 配置为静态
     if [[ "$HAS_TTY" == "false" ]]; then
-        log_warn "检测到非交互模式，无法进行网络配置交互"
-        log_info "推荐网卡: ${GREEN}$recommended${NC}"
+        log_warn "检测到非交互模式，将当前 IP 配置为静态"
+        
+        # 获取当前 IP 配置
+        local ip_config=$(get_current_ip_config "$recommended")
+        IFS=':' read -r current_ip current_gateway current_dns1 current_dns2 <<< "$ip_config"
+        
+        if [[ -z "$current_ip" ]]; then
+            log_error "无法获取网卡 $recommended 的 IP 地址"
+            log_info "请使用参数模式指定 IP:"
+            log_info "  curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash -s - $recommended 192.168.1.100 192.168.1.1"
+            return 1
+        fi
+        
+        log_info "检测到网卡配置:"
+        log_info "  网卡: ${GREEN}$recommended${NC}"
+        log_info "  IP地址: ${GREEN}$current_ip${NC}"
+        log_info "  网关: ${GREEN}$current_gateway${NC}"
+        log_info "  DNS: ${GREEN}$current_dns1, $current_dns2${NC}"
         log_info ""
-        log_info "选项1: 跳过网络配置，使用当前IP（${GREEN}推荐${NC}）"
-        log_info "选项2: 使用参数指定网络配置，如:"
-        log_info "  curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash -s - $recommended 192.168.1.100 192.168.1.1"
-        log_info ""
-        log_info "现在将跳过网络配置，仅启用 SSH"
+        log_info "将配置为静态 IP..."
+        
+        configure_network "$recommended" "$current_ip" "$current_gateway" "$current_dns1" "$current_dns2"
         return 0
     fi
     
