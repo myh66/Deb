@@ -308,25 +308,26 @@ interactive_setup() {
         IFS=':' read -r current_ip current_gateway current_dns1 current_dns2 <<< "$ip_config"
         
         if [[ -z "$current_ip" ]]; then
-            log_error "无法获取网卡 $recommended 的 IP 地址"
-            log_info "请使用参数模式指定 IP:"
-            log_info "  curl -fsSL https://raw.githubusercontent.com/myh66/Deb/main/init-debian.sh | sudo bash -s - $recommended 192.168.1.100 192.168.1.1"
+            log_error "无法获取网卡 $recommended 的 IP 地址，请检查网络连接"
             return 1
         fi
         
-        log_info "检测到网卡配置:"
+        log_info "========== 网络配置 =========="
+        log_info "自动检测到网卡配置:"
         log_info "  网卡: ${GREEN}$recommended${NC}"
         log_info "  IP地址: ${GREEN}$current_ip${NC}"
         log_info "  网关: ${GREEN}$current_gateway${NC}"
         log_info "  DNS: ${GREEN}$current_dns1, $current_dns2${NC}"
         log_info ""
-        log_info "将配置为静态 IP..."
+        log_info "正在将此配置设置为静态 IP..."
         
         configure_network "$recommended" "$current_ip" "$current_gateway" "$current_dns1" "$current_dns2"
         return 0
     fi
     
     # 交互模式
+    log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
+    # 交互模式 - 选择网卡
     log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
     read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface
     iface=${iface:-$recommended}  # 如果用户直接回车，使用推荐值
@@ -342,31 +343,72 @@ interactive_setup() {
         return 1
     fi
     
-    read -p "请输入静态IP（如：192.168.1.10）: " ip
-    if [[ -z "$ip" ]]; then
-        log_error "IP不能为空"
-        return 1
+    # 获取当前 IP 并提示用户
+    local ip_config=$(get_current_ip_config "$iface")
+    IFS=':' read -r current_ip current_gateway current_dns1 current_dns2 <<< "$ip_config"
+    
+    echo ""
+    log_info "检测到当前网络配置:"
+    log_info "  IP地址: ${GREEN}$current_ip${NC}"
+    log_info "  网关: ${GREEN}$current_gateway${NC}"
+    log_info "  DNS: ${GREEN}$current_dns1, $current_dns2${NC}"
+    echo ""
+    
+    read -p "是否使用此 IP？(y/n 直接回车使用 y): " use_current_ip
+    use_current_ip=${use_current_ip:-y}
+    
+    if [[ "$use_current_ip" =~ ^[Yy]$ ]]; then
+        # 用户选择使用当前 IP
+        log_info "使用当前 IP 地址"
+        
+        read -p "是否将其修改为静态？(y/n 直接回车使用 n): " set_static
+        set_static=${set_static:-n}
+        
+        if [[ "$set_static" =~ ^[Yy]$ ]]; then
+            # 配置为静态 IP
+            ip=$current_ip
+            gateway=$current_gateway
+            dns1=$current_dns1
+            dns2=$current_dns2
+        else
+            # 跳过网络配置
+            log_info "跳过网络配置，保持当前 IP"
+            return 0
+        fi
+    else
+        # 用户选择自定义 IP
+        log_info "使用自定义 IP 配置"
+        echo ""
+        
+        read -p "请输入静态IP（如：192.168.1.10）: " ip
+        if [[ -z "$ip" ]]; then
+            log_error "IP不能为空"
+            return 1
+        fi
+        
+        read -p "请输入网关（如：192.168.1.1）: " gateway
+        if [[ -z "$gateway" ]]; then
+            log_error "网关不能为空"
+            return 1
+        fi
+        
+        read -p "请输入DNS1（默认：8.8.8.8）: " dns1
+        dns1=${dns1:-8.8.8.8}
+        
+        read -p "请输入DNS2（默认：8.8.4.4）: " dns2
+        dns2=${dns2:-8.8.4.4}
     fi
     
-    read -p "请输入网关（如：192.168.1.1）: " gateway
-    if [[ -z "$gateway" ]]; then
-        log_error "网关不能为空"
-        return 1
-    fi
-    
-    read -p "请输入DNS1（默认：8.8.8.8）: " dns1
-    dns1=${dns1:-8.8.8.8}
-    
-    read -p "请输入DNS2（默认：8.8.4.4）: " dns2
-    dns2=${dns2:-8.8.4.4}
-    
-    log_info "配置参数："
+    log_info "========== 确认配置 =========="
     log_info "  网络接口: $iface"
     log_info "  IP地址: $ip/24"
     log_info "  网关: $gateway"
     log_info "  DNS: $dns1, $dns2"
+    echo ""
     
-    read -p "确认上述配置？(y/n): " confirm
+    read -p "确认上述配置？(y/n 直接回车使用 y): " confirm
+    confirm=${confirm:-y}
+    
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         configure_network "$iface" "$ip" "$gateway" "$dns1" "$dns2"
         return 0
@@ -405,15 +447,22 @@ main() {
     fi
     
     # 启用Root SSH登录
+    echo ""
+    log_info "========== SSH 配置 =========="
+    
     if [[ "$HAS_TTY" == "false" ]]; then
         log_warn "非交互模式，自动启用 root SSH 登录"
         enable_root_ssh
         generate_ssh_keys
     else
-        read -p "启用 root SSH 登录？(y/n): " enable_ssh
+        read -p "启用 root SSH 登录？(y/n 直接回车使用 y): " enable_ssh
+        enable_ssh=${enable_ssh:-y}
+        
         if [[ "$enable_ssh" =~ ^[Yy]$ ]]; then
             enable_root_ssh
             generate_ssh_keys
+        else
+            log_info "已跳过 SSH 配置"
         fi
     fi
     
