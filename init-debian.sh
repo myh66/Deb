@@ -8,6 +8,11 @@
 
 set -euo pipefail
 
+# 如果通过管道执行，重定向 stdin 到 /dev/tty 以支持交互式输入
+if [[ ! -t 0 ]]; then
+    exec </dev/tty
+fi
+
 # 颜色输出
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -272,10 +277,10 @@ interactive_setup() {
     
     if [[ -n "$recommended" ]]; then
         log_info "推荐使用网卡: ${GREEN}$recommended${NC}"
-        read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface < /dev/tty
+        read -p "请输入要配置的网络接口（直接回车使用推荐: $recommended）: " iface
         iface=${iface:-$recommended}  # 如果用户直接回车，使用推荐值
     else
-        read -p "请输入要配置的网络接口（如：eth0）: " iface < /dev/tty
+        read -p "请输入要配置的网络接口（如：eth0）: " iface
     fi
     
     if [[ -z "$iface" ]]; then
@@ -289,22 +294,22 @@ interactive_setup() {
         return 1
     fi
     
-    read -p "请输入静态IP（如：192.168.1.10）: " ip < /dev/tty
+    read -p "请输入静态IP（如：192.168.1.10）: " ip
     if [[ -z "$ip" ]]; then
         log_error "IP不能为空"
         return 1
     fi
     
-    read -p "请输入网关（如：192.168.1.1）: " gateway < /dev/tty
+    read -p "请输入网关（如：192.168.1.1）: " gateway
     if [[ -z "$gateway" ]]; then
         log_error "网关不能为空"
         return 1
     fi
     
-    read -p "请输入DNS1（默认：8.8.8.8）: " dns1 < /dev/tty
+    read -p "请输入DNS1（默认：8.8.8.8）: " dns1
     dns1=${dns1:-8.8.8.8}
     
-    read -p "请输入DNS2（默认：8.8.4.4）: " dns2 < /dev/tty
+    read -p "请输入DNS2（默认：8.8.4.4）: " dns2
     dns2=${dns2:-8.8.4.4}
     
     log_info "配置参数："
@@ -313,7 +318,7 @@ interactive_setup() {
     log_info "  网关: $gateway"
     log_info "  DNS: $dns1, $dns2"
     
-    read -p "确认上述配置？(y/n): " confirm < /dev/tty
+    read -p "确认上述配置？(y/n): " confirm
     if [[ "$confirm" =~ ^[Yy]$ ]]; then
         configure_network "$iface" "$ip" "$gateway" "$dns1" "$dns2"
         return 0
@@ -352,7 +357,7 @@ main() {
     fi
     
     # 启用Root SSH登录
-    read -p "启用 root SSH 登录？(y/n): " enable_ssh < /dev/tty
+    read -p "启用 root SSH 登录？(y/n): " enable_ssh
     if [[ "$enable_ssh" =~ ^[Yy]$ ]]; then
         enable_root_ssh
         generate_ssh_keys
