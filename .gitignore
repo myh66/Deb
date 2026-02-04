@@ -32,3 +32,11 @@ __pycache__/
 # Node
 node_modules/
 npm-debug.log
+
+# 私密文件夹（不上传）
+private/
+*.key
+*.pem
+*.cert
+*.p12
+*.pfx
